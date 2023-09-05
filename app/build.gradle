@@ -11,34 +11,6 @@ android {
         vectorDrawables.useSupportLibrary = true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
-
-        Properties properties = new Properties()
-        if (project.rootProject.file('local.properties').exists()) {
-            properties.load(project.rootProject.file('local.properties').newDataInputStream())
-        }
-        Boolean travis = System.getenv("TRAVIS") == "true"
-        String manifestScheme = properties.getProperty('test.scheme', '""')
-        buildConfigField "String", "USERNAME_MFA", travis ? '""' : properties.getProperty('mfa.username', '""')
-        buildConfigField "String", "PASSWORD_MFA", travis ? '""' : properties.getProperty('mfa.password', '""')
-        buildConfigField "String", "USERNAME", travis ? '""' : properties.getProperty('test.username', '""')
-        buildConfigField "String", "PASSWORD", travis ? '""' : properties.getProperty('test.password', '""')
-        buildConfigField "String", "PINCODE", travis ? '""' : properties.getProperty('test.pincode', '""')
-        buildConfigField "String", "CLIENT_ID", travis ? '""' : properties.getProperty('test.clientId', '""')
-        buildConfigField "String", "REDIRECT_URI", travis ? '""' : properties.getProperty('test.redirectUri', '""')
-        buildConfigField "String", "END_SESSION_URI", travis ? '""' : properties.getProperty('test.endSessionUri', '""')
-        buildConfigField "String[]", "SCOPES", travis ? "{}" : ("{" + properties.getProperty('test.scopes', '""') + "}")
-        buildConfigField "String", "DISCOVERY_URI", travis ? '""' : properties.getProperty('test.discoveryUri', '""')
-        buildConfigField "String[]", "IDP_SCOPE", travis ? "{}" : ("{" + properties.getProperty('test.idp_scope', '""') + "}")
-        buildConfigField "String", "IDP", travis ? '""' : properties.getProperty('test.idp', '""')
-        buildConfigField "String", "IDP_USERNAME", travis ? '""' : properties.getProperty('test.idp_username', '""')
-        buildConfigField "String", "IDP_PASSWORD", travis ? '""' : properties.getProperty('test.idp_password', '""')
-
-        // Make sure this is consistent with the redirect URI used in
-        // res/raw/okta_oidc_config
-//        manifestPlaceholders = [
-//                "appAuthRedirectScheme": manifestScheme
-//        ]
-
         manifestPlaceholders = [
                 "appAuthRedirectScheme": "com.example.hello"
         ]
