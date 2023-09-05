@@ -46,8 +46,6 @@ import com.okta.oidc.storage.SharedPreferenceStorage;
 import com.okta.oidc.storage.security.DefaultEncryptionManager;
 import com.okta.oidc.util.AuthorizationException;
 
-import java.io.IOException;
-import java.security.GeneralSecurityException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -82,9 +80,6 @@ public class SampleActivity extends AppCompatActivity {
     @VisibleForTesting
     OIDCConfig mOidcConfig;
 
-    OIDCConfig mOAuth2Config;
-    WebAuthClient mWebOAuth2;
-    SessionClient mSessionOAuth2Client;
     SessionClient mSessionNonWebClient;
 
     private TextView mTvStatus;
@@ -119,8 +114,6 @@ public class SampleActivity extends AppCompatActivity {
      */
     @VisibleForTesting
     SharedPreferenceStorage mStorageOidc;
-    @VisibleForTesting
-    EncryptedSharedPreferenceStorage mEncryptedSharedPref;
 
     private ScheduledExecutorService mExecutor = Executors.newSingleThreadScheduledExecutor();
 
@@ -345,23 +338,6 @@ public class SampleActivity extends AppCompatActivity {
         //use custom connection factory
         MyConnectionFactory factory = new MyConnectionFactory();
         factory.setClientType(MyConnectionFactory.USE_SYNC_OK_HTTP);
-
-        try {
-            mEncryptedSharedPref = new EncryptedSharedPreferenceStorage(this);
-        } catch (GeneralSecurityException | IOException ex) {
-            Log.d(TAG, "Unable to initialize EncryptedSharedPreferenceStorage", ex);
-        }
-
-        mWebOAuth2 = new Okta.WebAuthBuilder()
-                .withConfig(mOAuth2Config)
-                .withContext(getApplicationContext())
-                .withStorage(mEncryptedSharedPref)
-                .withEncryptionManager(new NoEncryption())
-                .setRequireHardwareBackedKeyStore(!isEmulator())
-                .supportedBrowsers(FIRE_FOX) //chrome is always supported by default
-                .create();
-
-        mSessionOAuth2Client = mWebOAuth2.getSessionClient();
 
         Okta.WebAuthBuilder builder = new Okta.WebAuthBuilder()
                 .withConfig(mOidcConfig)
