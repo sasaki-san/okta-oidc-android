@@ -18,28 +18,17 @@ package com.okta.oidc.example;
 import android.annotation.SuppressLint;
 import android.os.Build;
 import android.os.Bundle;
-import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
-import android.widget.Switch;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentTransaction;
-
-import com.google.android.material.textfield.TextInputEditText;
-import com.okta.authn.sdk.AuthenticationException;
-import com.okta.authn.sdk.AuthenticationStateHandlerAdapter;
-import com.okta.authn.sdk.client.AuthenticationClient;
-import com.okta.authn.sdk.client.AuthenticationClients;
-import com.okta.authn.sdk.resource.AuthenticationResponse;
 import com.okta.oidc.AuthenticationPayload;
 import com.okta.oidc.AuthorizationStatus;
 import com.okta.oidc.OIDCConfig;
@@ -53,7 +42,6 @@ import com.okta.oidc.clients.web.WebAuthClient;
 import com.okta.oidc.net.params.TokenTypeHint;
 import com.okta.oidc.net.response.IntrospectInfo;
 import com.okta.oidc.net.response.UserInfo;
-import com.okta.oidc.results.Result;
 import com.okta.oidc.storage.SharedPreferenceStorage;
 import com.okta.oidc.storage.security.DefaultEncryptionManager;
 import com.okta.oidc.util.AuthorizationException;
@@ -71,7 +59,7 @@ import static com.okta.oidc.AuthorizationStatus.EMAIL_VERIFICATION_UNAUTHENTICAT
  */
 @SuppressLint("SetTextI18n")
 @SuppressWarnings("FieldCanBeLocal")
-public class SampleActivity extends AppCompatActivity implements SignInDialog.SignInDialogListener {
+public class SampleActivity extends AppCompatActivity {
     private static final String TAG = "SampleActivity";
     private static final String PREF_SWITCH = "switch";
     private static final String PREF_NON_WEB = "nonweb";
@@ -101,7 +89,6 @@ public class SampleActivity extends AppCompatActivity implements SignInDialog.Si
 
     private TextView mTvStatus;
     private Button mSignInBrowser;
-    private Button mSignInNative;
     private Button mSignOut;
     private Button mGetProfile;
     private Button mClearData;
@@ -114,15 +101,12 @@ public class SampleActivity extends AppCompatActivity implements SignInDialog.Si
     private Button mIntrospectId;
     private Button mCheckExpired;
     private Button mCancel;
-    private Switch mSwitch;
     private ProgressBar mProgressBar;
     private boolean mIsSessionSignIn;
     @SuppressWarnings("unused")
     private static final String FIRE_FOX = "org.mozilla.firefox";
 
     private LinearLayout mRevokeContainer;
-
-    private TextInputEditText mEditText;
 
     /**
      * The payload to send for authorization.
@@ -138,11 +122,6 @@ public class SampleActivity extends AppCompatActivity implements SignInDialog.Si
     @VisibleForTesting
     EncryptedSharedPreferenceStorage mEncryptedSharedPref;
 
-    /**
-     * The Authentication API client.
-     */
-    protected AuthenticationClient mAuthenticationClient;
-    private SignInDialog mSignInDialog;
     private ScheduledExecutorService mExecutor = Executors.newSingleThreadScheduledExecutor();
 
     @Override
@@ -154,7 +133,6 @@ public class SampleActivity extends AppCompatActivity implements SignInDialog.Si
         mCancel = findViewById(R.id.cancel);
         mCheckExpired = findViewById(R.id.check_expired);
         mSignInBrowser = findViewById(R.id.sign_in);
-        mSignInNative = findViewById(R.id.sign_in_native);
         mSignOut = findViewById(R.id.sign_out);
         mClearData = findViewById(R.id.clear_data);
         mRevokeContainer = findViewById(R.id.revoke_token);
@@ -167,26 +145,10 @@ public class SampleActivity extends AppCompatActivity implements SignInDialog.Si
         mIntrospectRefresh = findViewById(R.id.introspect_refresh);
         mIntrospectAccess = findViewById(R.id.introspect_access);
         mIntrospectId = findViewById(R.id.introspect_id);
-        mSwitch = findViewById(R.id.switch1);
-
-        mEditText = findViewById(R.id.login_hint);
 
         mStorageOidc = new SharedPreferenceStorage(this);
-        boolean checked = getSharedPreferences(SampleActivity.class.getName(), MODE_PRIVATE)
-                .getBoolean(PREF_SWITCH, true);
         mIsSessionSignIn = getSharedPreferences(SampleActivity.class.getName(), MODE_PRIVATE)
                 .getBoolean(PREF_NON_WEB, true);
-
-        mSwitch.setChecked(checked);
-        mSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            setupCallback();//reset callbacks
-            if (getSessionClient().isAuthenticated()) {
-                showAuthenticatedMode();
-            } else {
-                showSignedOutMode();
-            }
-            mSwitch.setText(isChecked ? "OIDC" : "OAuth2");
-        });
 
         mCheckExpired.setOnClickListener(v -> {
             SessionClient client = getSessionClient();
@@ -275,6 +237,7 @@ public class SampleActivity extends AppCompatActivity implements SignInDialog.Si
         });
 
         mGetProfile.setOnClickListener(v -> getProfile());
+
         mRefreshToken.setOnClickListener(v -> {
             showNetworkProgress(true);
             SessionClient client = getSessionClient();
@@ -371,55 +334,12 @@ public class SampleActivity extends AppCompatActivity implements SignInDialog.Si
         mSignInBrowser.setOnClickListener(v -> {
             showNetworkProgress(true);
             WebAuthClient client = getWebAuthClient();
-            String loginHint = mEditText.getEditableText().toString();
-            if (!TextUtils.isEmpty(loginHint)) {
-                mPayload = new AuthenticationPayload.Builder()
-                        .setLoginHint(loginHint)
-                        .build();
-            }
             client.signIn(this, mPayload);
         });
-
-        mSignInNative.setOnClickListener(v -> {
-            FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
-            Fragment prev = getSupportFragmentManager().findFragmentByTag("signin");
-            if (prev != null) {
-                ft.remove(prev);
-            }
-            ft.addToBackStack(null);
-            mSignInDialog = new SignInDialog();
-            mSignInDialog.setListener(this);
-            mSignInDialog.show(ft, "signin");
-        });
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            mAuthenticationClient = AuthenticationClients.builder()
-                    .setOrgUrl(BuildConfig.DISCOVERY_URI)
-                    .build();
-        } else {
-            mSignInNative.setVisibility(View.GONE);
-        }
 
         //Example of using JSON file to create config
         mOidcConfig = new OIDCConfig.Builder()
                 .withJsonFile(this, R.raw.okta_oidc_config)
-                .create();
-
-        //Example of config
-        mOidcConfig = new OIDCConfig.Builder()
-                .clientId(BuildConfig.CLIENT_ID)
-                .redirectUri(BuildConfig.REDIRECT_URI)
-                .endSessionRedirectUri(BuildConfig.END_SESSION_URI)
-                .scopes(BuildConfig.SCOPES)
-                .discoveryUri(BuildConfig.DISCOVERY_URI)
-                .create();
-
-        mOAuth2Config = new OIDCConfig.Builder()
-                .clientId(BuildConfig.CLIENT_ID)
-                .redirectUri(BuildConfig.REDIRECT_URI)
-                .endSessionRedirectUri(BuildConfig.END_SESSION_URI)
-                .scopes(BuildConfig.SCOPES)
-                .discoveryUri(BuildConfig.DISCOVERY_URI + "/oauth2/default")
                 .create();
 
         //use custom connection factory
@@ -523,11 +443,7 @@ public class SampleActivity extends AppCompatActivity implements SignInDialog.Si
                         mTvStatus.setText(msg);
                     }
                 };
-        if (mSwitch.isChecked()) {
-            mWebAuth.registerCallback(callback, this);
-        } else {
-            mWebOAuth2.registerCallback(callback, this);
-        }
+        mWebAuth.registerCallback(callback, this);
     }
 
     @Override
@@ -543,7 +459,7 @@ public class SampleActivity extends AppCompatActivity implements SignInDialog.Si
         super.onStop();
         showNetworkProgress(false);
         getSharedPreferences(SampleActivity.class.getName(), MODE_PRIVATE).edit()
-                .putBoolean(PREF_SWITCH, mSwitch.isChecked()).apply();
+                .putBoolean(PREF_SWITCH, true).apply();
         getSharedPreferences(SampleActivity.class.getName(), MODE_PRIVATE).edit()
                 .putBoolean(PREF_NON_WEB, mIsSessionSignIn).apply();
 
@@ -554,20 +470,17 @@ public class SampleActivity extends AppCompatActivity implements SignInDialog.Si
         if (mIsSessionSignIn) {
             return mSessionNonWebClient;
         }
-        return mSwitch.isChecked() ? mSessionClient : mSessionOAuth2Client;
+        return mSessionClient;
     }
 
     private WebAuthClient getWebAuthClient() {
-        return mSwitch.isChecked() ? mWebAuth : mWebOAuth2;
+        return mWebAuth;
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         mExecutor.shutdownNow();
-        if (mSignInDialog != null && mSignInDialog.isVisible()) {
-            mSignInDialog.dismiss();
-        }
     }
 
     private void showNetworkProgress(boolean visible) {
@@ -582,16 +495,10 @@ public class SampleActivity extends AppCompatActivity implements SignInDialog.Si
         mRefreshToken.setVisibility(View.VISIBLE);
         mRevokeContainer.setVisibility(View.VISIBLE);
         mSignInBrowser.setVisibility(View.GONE);
-        mSignInNative.setVisibility(View.GONE);
     }
 
     private void showSignedOutMode() {
         mSignInBrowser.setVisibility(View.VISIBLE);
-        if (mAuthenticationClient != null) {
-            mSignInNative.setVisibility(View.VISIBLE);
-        } else {
-            mSignInNative.setVisibility(View.GONE);
-        }
         mGetProfile.setVisibility(View.GONE);
         mSignOut.setVisibility(View.GONE);
         mRefreshToken.setVisibility(View.GONE);
@@ -615,71 +522,6 @@ public class SampleActivity extends AppCompatActivity implements SignInDialog.Si
                 Log.d(TAG, error, exception.getCause());
                 mTvStatus.setText("Error : " + exception.errorDescription);
                 showNetworkProgress(false);
-            }
-        });
-    }
-
-    @Override
-    public void onSignIn(String username, String password) {
-        mSignInDialog.dismiss();
-        if (TextUtils.isEmpty(username) || TextUtils.isEmpty(password)) {
-            mTvStatus.setText("Invalid username or password");
-            return;
-        }
-        showNetworkProgress(true);
-        mExecutor.submit(() -> {
-            try {
-                if (mAuthenticationClient == null) {
-                    return;
-                }
-                mAuthenticationClient.authenticate(username, password.toCharArray(),
-                        null, new AuthenticationStateHandlerAdapter() {
-                            @Override
-                            public void handleUnknown(
-                                    AuthenticationResponse authenticationResponse) {
-                                SampleActivity.this.runOnUiThread(() -> {
-                                    showNetworkProgress(false);
-                                    mTvStatus.setText(authenticationResponse.getStatus().name());
-                                });
-                            }
-
-                            @Override
-                            public void handleLockedOut(AuthenticationResponse lockedOut) {
-                                SampleActivity.this.runOnUiThread(() -> {
-                                    showNetworkProgress(false);
-                                    mTvStatus.setText("Account locked out");
-                                });
-                            }
-
-                            @Override
-                            public void handleSuccess(AuthenticationResponse successResponse) {
-                                String sessionToken = successResponse.getSessionToken();
-                                mAuthClient.signIn(sessionToken, mPayload,
-                                        new RequestCallback<Result,
-                                                AuthorizationException>() {
-                                            @Override
-                                            public void onSuccess(
-                                                    @NonNull Result result) {
-                                                mTvStatus.setText("authentication authorized");
-                                                mIsSessionSignIn = true;
-                                                showAuthenticatedMode();
-                                                showNetworkProgress(false);
-                                            }
-
-                                            @Override
-                                            public void onError(String error,
-                                                                AuthorizationException exception) {
-                                                mTvStatus.setText(error);
-                                            }
-                                        });
-                            }
-                        });
-            } catch (AuthenticationException e) {
-                Log.e(TAG, Log.getStackTraceString(e));
-                runOnUiThread(() -> {
-                    showNetworkProgress(false);
-                    mTvStatus.setText(e.getMessage());
-                });
             }
         });
     }
