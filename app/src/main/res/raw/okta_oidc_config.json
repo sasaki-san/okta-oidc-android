@@ -1,11 +1,11 @@
 {
-  "client_id": "{clientId}",
-  "redirect_uri": "{redirectUri}",
-  "end_session_redirect_uri": "{endSessionUri}",
+  "client_id": "0oa2gk268Uz9BYHlt756",
+  "redirect_uri": "com.example.hello://yusasaki-jp.okta.com/cordova/com.example.hello/callback",
+  "end_session_redirect_uri": "com.example.hello://yusasaki-jp.okta.com/cordova/com.example.hello/callback",
   "scopes": [
     "openid",
     "profile",
     "offline_access"
   ],
-  "discovery_uri": "https://{yourOktaDomain}"
+  "discovery_uri": "https://yusasaki-jp.okta.com"
 }

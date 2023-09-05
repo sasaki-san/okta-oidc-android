@@ -7,7 +7,7 @@ android {
         minSdkVersion 23
         compileSdkVersion rootProject.ext.compileSdkVersion
         targetSdkVersion rootProject.compileSdkVersion
-        applicationId "com.okta.oidc.example"
+        applicationId "com.example.hello"
         vectorDrawables.useSupportLibrary = true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
@@ -35,8 +35,12 @@ android {
 
         // Make sure this is consistent with the redirect URI used in
         // res/raw/okta_oidc_config
+//        manifestPlaceholders = [
+//                "appAuthRedirectScheme": manifestScheme
+//        ]
+
         manifestPlaceholders = [
-                "appAuthRedirectScheme": manifestScheme
+                "appAuthRedirectScheme": "com.example.hello"
         ]
     }
 
