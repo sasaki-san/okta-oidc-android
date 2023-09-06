@@ -59,7 +59,6 @@ import static com.okta.oidc.AuthorizationStatus.EMAIL_VERIFICATION_UNAUTHENTICAT
 @SuppressWarnings("FieldCanBeLocal")
 public class SampleActivity extends AppCompatActivity {
     private static final String TAG = "SampleActivity";
-    private static final String PREF_SWITCH = "switch";
     private static final String PREF_NON_WEB = "nonweb";
     /**
      * Authorization client using chrome custom tab as a user agent.
@@ -80,8 +79,6 @@ public class SampleActivity extends AppCompatActivity {
     @VisibleForTesting
     OIDCConfig mOidcConfig;
 
-    SessionClient mSessionNonWebClient;
-
     private TextView mTvStatus;
     private Button mSignInBrowser;
     private Button mSignOut;
@@ -97,8 +94,6 @@ public class SampleActivity extends AppCompatActivity {
     private Button mCancel;
     private ProgressBar mProgressBar;
     private boolean mIsSessionSignIn;
-    @SuppressWarnings("unused")
-    private static final String FIRE_FOX = "org.mozilla.firefox";
 
     private LinearLayout mRevokeContainer;
 
@@ -340,8 +335,7 @@ public class SampleActivity extends AppCompatActivity {
                 .withEncryptionManager(new DefaultEncryptionManager(this))
                 .setRequireHardwareBackedKeyStore(!isEmulator())
                 .withTabColor(0)
-                .withOktaHttpClient(factory.build())
-                .supportedBrowsers(FIRE_FOX);
+                .withOktaHttpClient(factory.build());
 
         mWebAuth = builder.create();
 
@@ -355,8 +349,6 @@ public class SampleActivity extends AppCompatActivity {
                 .setRequireHardwareBackedKeyStore(false)
                 .withCallbackExecutor(null)
                 .create();
-
-        mSessionNonWebClient = mAuthClient.getSessionClient();
 
         if (getSessionClient().isAuthenticated()) {
             showAuthenticatedMode();
@@ -390,17 +382,13 @@ public class SampleActivity extends AppCompatActivity {
                             //this only clears the session.
                             mTvStatus.setText("signedOutOfOkta");
                             showNetworkProgress(false);
+
                             // clear session
+                            SessionClient sessionClient = getSessionClient();
+                            sessionClient.clear();
+                            mTvStatus.setText("clear data");
+                            showSignedOutMode();
 
-            SessionClient sessionClient = getSessionClient();
-            sessionClient.clear();
-            mTvStatus.setText("clear data");
-            showSignedOutMode();
-
-                        } else if (status == EMAIL_VERIFICATION_AUTHENTICATED
-                                || status == EMAIL_VERIFICATION_UNAUTHENTICATED) {
-                            //Result is email verification. sign in again.
-                            getWebAuthClient().signIn(SampleActivity.this, mPayload);
                         }
                     }
 
@@ -435,17 +423,11 @@ public class SampleActivity extends AppCompatActivity {
         super.onStop();
         showNetworkProgress(false);
         getSharedPreferences(SampleActivity.class.getName(), MODE_PRIVATE).edit()
-                .putBoolean(PREF_SWITCH, true).apply();
-        getSharedPreferences(SampleActivity.class.getName(), MODE_PRIVATE).edit()
                 .putBoolean(PREF_NON_WEB, mIsSessionSignIn).apply();
 
     }
 
     private SessionClient getSessionClient() {
-
-        if (mIsSessionSignIn) {
-            return mSessionNonWebClient;
-        }
         return mSessionClient;
     }
 
