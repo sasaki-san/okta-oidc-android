@@ -44,6 +44,7 @@ import com.okta.oidc.storage.security.DefaultEncryptionManager;
 import com.okta.oidc.util.AuthorizationException;
 
 import java.io.IOException;
+import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -306,7 +307,6 @@ public class SampleActivity extends AppCompatActivity {
         mSignOut.setVisibility(View.GONE);
         mRefreshToken.setVisibility(View.GONE);
         mCallApi.setVisibility(View.GONE);
-        mTvStatus.setText("");
     }
 
     private void getProfile() {
@@ -328,92 +328,132 @@ public class SampleActivity extends AppCompatActivity {
         });
     }
 
-    private void callApi() {
-        try {
-            showNetworkProgress(true);
-            SessionClient client = getSessionClient();
+    public interface CallApiCallback {
+        void onAccessTokenReceived(String accessToken);
+        void onRefreshTokenExpiredErrorReceived();
+        void onError(Exception e);
+    }
 
+    private void withAccessToken(CallApiCallback callback) {
+
+        SessionClient client = getSessionClient();
+
+        try {
             // アクセストークンが有効期限内かどうか確認
-            if(client.getTokens().isAccessTokenExpired()) {
-                // リフレッシュトークンを使ってトークンを更新
+            if (client.getTokens().isAccessTokenExpired()) {
+                // アクセストークンの有効期限が切れているので、リフレッシュトークンを使ってトークンを更新
                 client.refreshToken(new RequestCallback<Tokens, AuthorizationException>() {
                     @Override
                     public void onSuccess(@NonNull Tokens result) {
-                        mTvStatus.setText("token refreshed");
-                        showNetworkProgress(false);
+                        callback.onAccessTokenReceived(result.getAccessToken());
                     }
 
                     @Override
                     public void onError(String error, AuthorizationException exception) {
-                        // リフレッシュトークンが使用できなかったため、再認証が必要。
-                        mTvStatus.setText(exception.errorDescription);
-                        showNetworkProgress(false);
+                        if(Objects.equals(exception.error, "invalid_grant") && Objects.requireNonNull(exception.errorDescription).contains("expired")) {
+                            // リフレッシュトークンの有効期限切れ。
+                            callback.onRefreshTokenExpiredErrorReceived();
+                        } else {
+                            // リフレッシュトークン取得中にエラー発生。
+                            callback.onError(exception);
+                        }
                     }
                 });
-            }
-
-            // アクセストークン取得
-            String accessToken = null;
-            try {
-                accessToken = client.getTokens().getAccessToken();
-            } catch (AuthorizationException e) {
-                mTvStatus.setText("Error : " + e);
-                Log.d(TAG, e.toString(), e.getCause());
-                showNetworkProgress(false);
-                return;
-            }
-
-            Request.Builder requestBuilder = new Request.Builder().url(API_END_POINT);
-            Log.d(TAG, accessToken);
-            requestBuilder.addHeader("Authorization", "Bearer " + accessToken);
-            requestBuilder = requestBuilder.get();
-            Request request = requestBuilder.build();
-            Call mCall = mOkHttpClient.newCall(request);
-            final CountDownLatch latch = new CountDownLatch(1);
-
-            final Exception[] exception = new Exception[1];
-            final Response[] response = new Response[1];
-
-            mCall.enqueue(new Callback() {
-                @Override
-                public void onFailure(Call call, IOException e) {
-                    exception[0] = e;
-                    latch.countDown();
-                }
-
-                @Override
-                public void onResponse(Call call, Response r) {
-                    response[0] = r;
-                    latch.countDown();
-                }
-            });
-            latch.await();
-            if (exception[0] != null) {
-                Exception e = exception[0];
-                mTvStatus.setText("Error : " + e);
-                Log.d(TAG, e.toString(), e.getCause());
-                showNetworkProgress(false);
-            }
-            if (response[0] != null) {
-
-                if(response[0].code() != 200) {
-                    mTvStatus.setText("Error : " + response[0].message());
-                    Log.d(TAG, response[0].message());
-                    showNetworkProgress(false);
-                    return;
-                }
-
-                final String resultStr = response[0].body().string();
-
-                Log.d(TAG, resultStr);
-                mTvStatus.setText(resultStr);
-                showNetworkProgress(false);
+            } else {
+                // アクセストークンが有効期限内なのでそのまま返却
+                callback.onAccessTokenReceived(client.getTokens().getAccessToken());
             }
         } catch (Exception e) {
-            mTvStatus.setText("Error : " + e);
-            Log.d(TAG, e.toString(), e.getCause());
-            showNetworkProgress(false);
+            callback.onError(e);
         }
+    }
+
+    private String callApiWithAccessToken(String url, String accessToken) throws Exception {
+
+        Request.Builder requestBuilder = new Request.Builder().url(url);
+        requestBuilder.addHeader("Authorization", "Bearer " + accessToken);
+        requestBuilder = requestBuilder.get();
+
+        Request request = requestBuilder.build();
+
+        Call mCall = mOkHttpClient.newCall(request);
+
+        final CountDownLatch latch = new CountDownLatch(1);
+        final Exception[] exception = new Exception[1];
+        final Response[] response = new Response[1];
+
+        mCall.enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                exception[0] = e;
+                latch.countDown();
+            }
+
+            @Override
+            public void onResponse(Call call, Response r) {
+                response[0] = r;
+                latch.countDown();
+            }
+        });
+
+        latch.await();
+
+        if (exception[0] != null) {
+            throw exception[0];
+        }
+
+        if(response[0].code() != 200) {
+            String error = "Error status code:" + response[0].code() + ", Message: " + response[0].message();
+            throw new Exception(error);
+        }
+
+        assert response[0].body() != null;
+        return response[0].body().string();
+    }
+
+    private void callApi() {
+
+        showNetworkProgress(true);
+
+        withAccessToken(new CallApiCallback() {
+            @Override
+            public void onAccessTokenReceived(String accessToken) {
+                Log.d(TAG, accessToken);
+
+                // Access Token取得成功。 API呼び出し
+                String result;
+                try {
+                    result = callApiWithAccessToken(API_END_POINT, accessToken);
+                    Log.d(TAG, result);
+                    mTvStatus.setText(result);
+                } catch (Exception e) {
+                    mTvStatus.setText("Error : " + e);
+                    Log.d(TAG, e.toString(), e.getCause());
+                }
+                showNetworkProgress(false);
+            }
+
+            @Override
+            public void onRefreshTokenExpiredErrorReceived() {
+                // Refresh Tokenの有効期限が切れている。再ログインが必要。
+                mTvStatus.setText("Error : Refresh Token 有効期限切れ。再認証が必要。");
+                Log.d(TAG, "Error : Refresh Token 有効期限切れ。再認証が必要。");
+                showNetworkProgress(false);
+
+                // clear session
+                SessionClient sessionClient = getSessionClient();
+                sessionClient.clear();
+                showSignedOutMode();
+            }
+
+            @Override
+            public void onError(Exception e) {
+                // エラー発生
+                mTvStatus.setText("Error : " + e);
+                Log.d(TAG, e.toString(), e.getCause());
+                showNetworkProgress(false);
+            }
+        });
     }
 
     /**
