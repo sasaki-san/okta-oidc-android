@@ -21,7 +21,6 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
@@ -39,8 +38,6 @@ import com.okta.oidc.Tokens;
 import com.okta.oidc.clients.AuthClient;
 import com.okta.oidc.clients.sessions.SessionClient;
 import com.okta.oidc.clients.web.WebAuthClient;
-import com.okta.oidc.net.params.TokenTypeHint;
-import com.okta.oidc.net.response.IntrospectInfo;
 import com.okta.oidc.net.response.UserInfo;
 import com.okta.oidc.storage.SharedPreferenceStorage;
 import com.okta.oidc.storage.security.DefaultEncryptionManager;
@@ -49,9 +46,6 @@ import com.okta.oidc.util.AuthorizationException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
-import static com.okta.oidc.AuthorizationStatus.EMAIL_VERIFICATION_AUTHENTICATED;
-import static com.okta.oidc.AuthorizationStatus.EMAIL_VERIFICATION_UNAUTHENTICATED;
-
 /**
  * Sample to test library functionality. Can be used as a starting reference point.
  */
@@ -59,7 +53,6 @@ import static com.okta.oidc.AuthorizationStatus.EMAIL_VERIFICATION_UNAUTHENTICAT
 @SuppressWarnings("FieldCanBeLocal")
 public class SampleActivity extends AppCompatActivity {
     private static final String TAG = "SampleActivity";
-    private static final String PREF_NON_WEB = "nonweb";
     /**
      * Authorization client using chrome custom tab as a user agent.
      */
@@ -85,17 +78,10 @@ public class SampleActivity extends AppCompatActivity {
     private Button mGetProfile;
 
     private Button mRefreshToken;
-    private Button mRevokeRefresh;
-    private Button mRevokeAccess;
-    private Button mIntrospectRefresh;
-    private Button mIntrospectAccess;
-    private Button mIntrospectId;
-    private Button mCheckExpired;
+
+    private Button mCallApi;
     private Button mCancel;
     private ProgressBar mProgressBar;
-    private boolean mIsSessionSignIn;
-
-    private LinearLayout mRevokeContainer;
 
     /**
      * The payload to send for authorization.
@@ -118,109 +104,15 @@ public class SampleActivity extends AppCompatActivity {
 
         setContentView(R.layout.sample_activity);
         mCancel = findViewById(R.id.cancel);
-        mCheckExpired = findViewById(R.id.check_expired);
         mSignInBrowser = findViewById(R.id.sign_in);
         mSignOut = findViewById(R.id.sign_out);
-        mRevokeContainer = findViewById(R.id.revoke_token);
-        mRevokeAccess = findViewById(R.id.revoke_access);
-        mRevokeRefresh = findViewById(R.id.revoke_refresh);
         mRefreshToken = findViewById(R.id.refresh_token);
+        mCallApi = findViewById(R.id.call_api);
         mGetProfile = findViewById(R.id.get_profile);
         mProgressBar = findViewById(R.id.progress_horizontal);
         mTvStatus = findViewById(R.id.status);
-        mIntrospectRefresh = findViewById(R.id.introspect_refresh);
-        mIntrospectAccess = findViewById(R.id.introspect_access);
-        mIntrospectId = findViewById(R.id.introspect_id);
 
         mStorageOidc = new SharedPreferenceStorage(this);
-        mIsSessionSignIn = getSharedPreferences(SampleActivity.class.getName(), MODE_PRIVATE)
-                .getBoolean(PREF_NON_WEB, true);
-
-        mCheckExpired.setOnClickListener(v -> {
-            SessionClient client = getSessionClient();
-            try {
-                mTvStatus.setText(client.getTokens().isAccessTokenExpired() ? "token expired" :
-                        "token not expired");
-            } catch (AuthorizationException e) {
-                Log.d(TAG, "", e);
-            }
-        });
-
-        mIntrospectRefresh.setOnClickListener(v -> {
-            showNetworkProgress(true);
-            SessionClient client = getSessionClient();
-            String refreshToken;
-            try {
-                refreshToken = client.getTokens().getRefreshToken();
-                client.introspectToken(refreshToken, TokenTypeHint.REFRESH_TOKEN,
-                        new RequestCallback<IntrospectInfo, AuthorizationException>() {
-                            @Override
-                            public void onSuccess(@NonNull IntrospectInfo result) {
-                                mTvStatus.setText("RefreshToken active: " + result.isActive());
-                                mProgressBar.setVisibility(View.GONE);
-                            }
-
-                            @Override
-                            public void onError(String error, AuthorizationException exception) {
-                                mTvStatus.setText("RefreshToken Introspect error");
-                                mProgressBar.setVisibility(View.GONE);
-                            }
-                        }
-                );
-            } catch (AuthorizationException e) {
-                Log.d(TAG, "", e);
-            }
-        });
-
-        mIntrospectAccess.setOnClickListener(v -> {
-            showNetworkProgress(true);
-            SessionClient client = getSessionClient();
-            try {
-                client.introspectToken(
-                        client.getTokens().getAccessToken(), TokenTypeHint.ACCESS_TOKEN,
-                        new RequestCallback<IntrospectInfo, AuthorizationException>() {
-                            @Override
-                            public void onSuccess(@NonNull IntrospectInfo result) {
-                                mTvStatus.setText("AccessToken active: " + result.isActive());
-                                mProgressBar.setVisibility(View.GONE);
-                            }
-
-                            @Override
-                            public void onError(String error, AuthorizationException exception) {
-                                mTvStatus.setText("AccessToken Introspect error");
-                                mProgressBar.setVisibility(View.GONE);
-                            }
-                        }
-                );
-            } catch (AuthorizationException e) {
-                Log.d(TAG, "", e);
-            }
-        });
-
-        mIntrospectId.setOnClickListener(v -> {
-            showNetworkProgress(true);
-            SessionClient client = getSessionClient();
-            try {
-                client.introspectToken(
-                        client.getTokens().getIdToken(), TokenTypeHint.ID_TOKEN,
-                        new RequestCallback<IntrospectInfo, AuthorizationException>() {
-                            @Override
-                            public void onSuccess(@NonNull IntrospectInfo result) {
-                                mTvStatus.setText("IdToken active: " + result.isActive());
-                                mProgressBar.setVisibility(View.GONE);
-                            }
-
-                            @Override
-                            public void onError(String error, AuthorizationException exception) {
-                                mTvStatus.setText("IdToken Introspect error");
-                                mProgressBar.setVisibility(View.GONE);
-                            }
-                        }
-                );
-            } catch (AuthorizationException e) {
-                Log.d(TAG, "", e);
-            }
-        });
 
         mGetProfile.setOnClickListener(v -> getProfile());
 
@@ -242,68 +134,7 @@ public class SampleActivity extends AppCompatActivity {
             });
         });
 
-        mRevokeRefresh.setOnClickListener(v -> {
-            SessionClient client = getSessionClient();
-            try {
-                Tokens tokens = client.getTokens();
-                if (tokens != null && tokens.getRefreshToken() != null) {
-                    mProgressBar.setVisibility(View.VISIBLE);
-                    client.revokeToken(client.getTokens().getRefreshToken(),
-                            new RequestCallback<Boolean, AuthorizationException>() {
-                                @Override
-                                public void onSuccess(@NonNull Boolean result) {
-
-                                    String status = "Revoke refresh token : " + result;
-                                    Log.d(TAG, status);
-                                    mTvStatus.setText(status);
-                                    mProgressBar.setVisibility(View.GONE);
-                                }
-
-                                @Override
-                                public void onError(String error,
-                                                    AuthorizationException exception) {
-                                    Log.d(TAG, exception.error +
-                                            " revokeRefreshToken onError " + error, exception);
-                                    mTvStatus.setText(error);
-                                    mProgressBar.setVisibility(View.GONE);
-                                }
-                            });
-                }
-            } catch (AuthorizationException e) {
-                Log.d(TAG, "", e);
-            }
-        });
-
-        mRevokeAccess.setOnClickListener(v -> {
-            SessionClient client = getSessionClient();
-            try {
-                Tokens tokens = client.getTokens();
-                if (tokens != null && tokens.getAccessToken() != null) {
-                    mProgressBar.setVisibility(View.VISIBLE);
-                    client.revokeToken(client.getTokens().getAccessToken(),
-                            new RequestCallback<Boolean, AuthorizationException>() {
-                                @Override
-                                public void onSuccess(@NonNull Boolean result) {
-                                    String status = "Revoke Access token : " + result;
-                                    Log.d(TAG, status);
-                                    mTvStatus.setText(status);
-                                    mProgressBar.setVisibility(View.GONE);
-                                }
-
-                                @Override
-                                public void onError(String error,
-                                                    AuthorizationException exception) {
-                                    Log.d(TAG, exception.error +
-                                            " revokeAccessToken onError " + error, exception);
-                                    mTvStatus.setText(error);
-                                    mProgressBar.setVisibility(View.GONE);
-                                }
-                            });
-                }
-            } catch (AuthorizationException e) {
-                Log.d(TAG, "", e);
-            }
-        });
+        mCallApi.setOnClickListener(v -> callApi());
 
         mSignOut.setOnClickListener(v -> {
             showNetworkProgress(true);
@@ -376,7 +207,6 @@ public class SampleActivity extends AppCompatActivity {
                             mTvStatus.setText("authentication authorized");
                             showAuthenticatedMode();
                             showNetworkProgress(false);
-                            mIsSessionSignIn = false;
                             mProgressBar.setVisibility(View.GONE);
                         } else if (status == AuthorizationStatus.SIGNED_OUT) {
                             //this only clears the session.
@@ -422,9 +252,6 @@ public class SampleActivity extends AppCompatActivity {
     protected void onStop() {
         super.onStop();
         showNetworkProgress(false);
-        getSharedPreferences(SampleActivity.class.getName(), MODE_PRIVATE).edit()
-                .putBoolean(PREF_NON_WEB, mIsSessionSignIn).apply();
-
     }
 
     private SessionClient getSessionClient() {
@@ -450,7 +277,7 @@ public class SampleActivity extends AppCompatActivity {
         mGetProfile.setVisibility(View.VISIBLE);
         mSignOut.setVisibility(View.VISIBLE);
         mRefreshToken.setVisibility(View.VISIBLE);
-        mRevokeContainer.setVisibility(View.VISIBLE);
+        mCallApi.setVisibility(View.VISIBLE);
         mSignInBrowser.setVisibility(View.GONE);
     }
 
@@ -459,11 +286,30 @@ public class SampleActivity extends AppCompatActivity {
         mGetProfile.setVisibility(View.GONE);
         mSignOut.setVisibility(View.GONE);
         mRefreshToken.setVisibility(View.GONE);
-        mRevokeContainer.setVisibility(View.GONE);
+        mCallApi.setVisibility(View.GONE);
         mTvStatus.setText("");
     }
 
     private void getProfile() {
+        showNetworkProgress(true);
+        SessionClient client = getSessionClient();
+        client.getUserProfile(new RequestCallback<UserInfo, AuthorizationException>() {
+            @Override
+            public void onSuccess(@NonNull UserInfo result) {
+                mTvStatus.setText(result.toString());
+                showNetworkProgress(false);
+            }
+
+            @Override
+            public void onError(String error, AuthorizationException exception) {
+                Log.d(TAG, error, exception.getCause());
+                mTvStatus.setText("Error : " + exception.errorDescription);
+                showNetworkProgress(false);
+            }
+        });
+    }
+
+    private void callApi() {
         showNetworkProgress(true);
         SessionClient client = getSessionClient();
         client.getUserProfile(new RequestCallback<UserInfo, AuthorizationException>() {

@@ -58,6 +58,19 @@
                     android:indeterminate="true"
                     android:visibility="gone" />
 
+                <TextView
+                    android:id="@+id/text_view"
+                    android:layout_width="fill_parent"
+                    android:layout_height="wrap_content"
+                    android:singleLine="false"
+                    android:scrollbars="vertical"
+                    android:textColor="#000"
+                    android:textSize="30sp"
+                    android:text="Java Sample App 1"
+                    tools:ignore="HardcodedText"
+                    >
+                </TextView>
+
                 <Button
                     android:id="@+id/sign_in"
                     android:layout_width="match_parent"
@@ -89,63 +102,19 @@
                     android:visibility="gone"
                     tools:ignore="HardcodedText" />
 
+                <Button
+                    android:id="@+id/call_api"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Call API"
+                    android:visibility="gone"
+                    tools:ignore="HardcodedText" />
+
                 <TextView
                     android:id="@+id/status"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
 
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/revoke_token"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:gravity="center"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <Button
-                    android:id="@+id/revoke_refresh"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Revoke refresh token"
-                    tools:ignore="HardcodedText" />
-
-                <Button
-                    android:id="@+id/revoke_access"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Revoke access token"
-                    tools:ignore="HardcodedText" />
-
-                <Button
-                    android:id="@+id/introspect_refresh"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Instrospect refresh token"
-                    tools:ignore="HardcodedText" />
-
-                <Button
-                    android:id="@+id/introspect_access"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Instrospect access token"
-                    tools:ignore="HardcodedText" />
-
-                <Button
-                    android:id="@+id/introspect_id"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Instrospect id token"
-                    tools:ignore="HardcodedText" />
-
-                <Button
-                    android:id="@+id/check_expired"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Check expired"
-                    tools:ignore="HardcodedText" />
             </LinearLayout>
 
         </LinearLayout>
