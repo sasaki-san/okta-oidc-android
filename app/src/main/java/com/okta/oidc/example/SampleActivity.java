@@ -43,8 +43,18 @@ import com.okta.oidc.storage.SharedPreferenceStorage;
 import com.okta.oidc.storage.security.DefaultEncryptionManager;
 import com.okta.oidc.util.AuthorizationException;
 
+import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * Sample to test library functionality. Can be used as a starting reference point.
@@ -96,6 +106,10 @@ public class SampleActivity extends AppCompatActivity {
     SharedPreferenceStorage mStorageOidc;
 
     private ScheduledExecutorService mExecutor = Executors.newSingleThreadScheduledExecutor();
+
+    private OkHttpClient mOkHttpClient;
+
+    private static final String API_END_POINT = "https://yusasaki-apimanagement.azure-api.net/api";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -191,6 +205,11 @@ public class SampleActivity extends AppCompatActivity {
             showNetworkProgress(false);
         });
         setupCallback();
+
+        mOkHttpClient = new OkHttpClient.Builder()
+                .connectTimeout(15_000, TimeUnit.MILLISECONDS)
+                .readTimeout(10_000, TimeUnit.MILLISECONDS)
+                .build();
     }
 
     /**
@@ -310,22 +329,91 @@ public class SampleActivity extends AppCompatActivity {
     }
 
     private void callApi() {
-        showNetworkProgress(true);
-        SessionClient client = getSessionClient();
-        client.getUserProfile(new RequestCallback<UserInfo, AuthorizationException>() {
-            @Override
-            public void onSuccess(@NonNull UserInfo result) {
-                mTvStatus.setText(result.toString());
-                showNetworkProgress(false);
+        try {
+            showNetworkProgress(true);
+            SessionClient client = getSessionClient();
+
+            // アクセストークンが有効期限内かどうか確認
+            if(client.getTokens().isAccessTokenExpired()) {
+                // リフレッシュトークンを使ってトークンを更新
+                client.refreshToken(new RequestCallback<Tokens, AuthorizationException>() {
+                    @Override
+                    public void onSuccess(@NonNull Tokens result) {
+                        mTvStatus.setText("token refreshed");
+                        showNetworkProgress(false);
+                    }
+
+                    @Override
+                    public void onError(String error, AuthorizationException exception) {
+                        // リフレッシュトークンが使用できなかったため、再認証が必要。
+                        mTvStatus.setText(exception.errorDescription);
+                        showNetworkProgress(false);
+                    }
+                });
             }
 
-            @Override
-            public void onError(String error, AuthorizationException exception) {
-                Log.d(TAG, error, exception.getCause());
-                mTvStatus.setText("Error : " + exception.errorDescription);
+            // アクセストークン取得
+            String accessToken = null;
+            try {
+                accessToken = client.getTokens().getAccessToken();
+            } catch (AuthorizationException e) {
+                mTvStatus.setText("Error : " + e);
+                Log.d(TAG, e.toString(), e.getCause());
+                showNetworkProgress(false);
+                return;
+            }
+
+            Request.Builder requestBuilder = new Request.Builder().url(API_END_POINT);
+            Log.d(TAG, accessToken);
+            requestBuilder.addHeader("Authorization", "Bearer " + accessToken);
+            requestBuilder = requestBuilder.get();
+            Request request = requestBuilder.build();
+            Call mCall = mOkHttpClient.newCall(request);
+            final CountDownLatch latch = new CountDownLatch(1);
+
+            final Exception[] exception = new Exception[1];
+            final Response[] response = new Response[1];
+
+            mCall.enqueue(new Callback() {
+                @Override
+                public void onFailure(Call call, IOException e) {
+                    exception[0] = e;
+                    latch.countDown();
+                }
+
+                @Override
+                public void onResponse(Call call, Response r) {
+                    response[0] = r;
+                    latch.countDown();
+                }
+            });
+            latch.await();
+            if (exception[0] != null) {
+                Exception e = exception[0];
+                mTvStatus.setText("Error : " + e);
+                Log.d(TAG, e.toString(), e.getCause());
                 showNetworkProgress(false);
             }
-        });
+            if (response[0] != null) {
+
+                if(response[0].code() != 200) {
+                    mTvStatus.setText("Error : " + response[0].message());
+                    Log.d(TAG, response[0].message());
+                    showNetworkProgress(false);
+                    return;
+                }
+
+                final String resultStr = response[0].body().string();
+
+                Log.d(TAG, resultStr);
+                mTvStatus.setText(resultStr);
+                showNetworkProgress(false);
+            }
+        } catch (Exception e) {
+            mTvStatus.setText("Error : " + e);
+            Log.d(TAG, e.toString(), e.getCause());
+            showNetworkProgress(false);
+        }
     }
 
     /**
