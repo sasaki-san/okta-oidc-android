@@ -89,14 +89,6 @@
                     android:visibility="gone"
                     tools:ignore="HardcodedText" />
 
-                <Button
-                    android:id="@+id/clear_data"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Clear Data"
-                    android:visibility="gone"
-                    tools:ignore="HardcodedText" />
-
                 <TextView
                     android:id="@+id/status"
                     android:layout_width="match_parent"

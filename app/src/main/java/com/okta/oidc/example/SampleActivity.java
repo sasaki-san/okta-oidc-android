@@ -86,7 +86,6 @@ public class SampleActivity extends AppCompatActivity {
     private Button mSignInBrowser;
     private Button mSignOut;
     private Button mGetProfile;
-    private Button mClearData;
 
     private Button mRefreshToken;
     private Button mRevokeRefresh;
@@ -127,7 +126,6 @@ public class SampleActivity extends AppCompatActivity {
         mCheckExpired = findViewById(R.id.check_expired);
         mSignInBrowser = findViewById(R.id.sign_in);
         mSignOut = findViewById(R.id.sign_out);
-        mClearData = findViewById(R.id.clear_data);
         mRevokeContainer = findViewById(R.id.revoke_token);
         mRevokeAccess = findViewById(R.id.revoke_access);
         mRevokeRefresh = findViewById(R.id.revoke_refresh);
@@ -314,14 +312,9 @@ public class SampleActivity extends AppCompatActivity {
 
         mSignOut.setOnClickListener(v -> {
             showNetworkProgress(true);
-            WebAuthClient client = getWebAuthClient();
-            client.signOutOfOkta(this);
-        });
-        mClearData.setOnClickListener(v -> {
-            SessionClient client = getSessionClient();
-            client.clear();
-            mTvStatus.setText("clear data");
-            showSignedOutMode();
+            WebAuthClient webAuthClient = getWebAuthClient();
+            webAuthClient.signOutOfOkta(this);
+
         });
 
         mSignInBrowser.setOnClickListener(v -> {
@@ -397,6 +390,13 @@ public class SampleActivity extends AppCompatActivity {
                             //this only clears the session.
                             mTvStatus.setText("signedOutOfOkta");
                             showNetworkProgress(false);
+                            // clear session
+
+            SessionClient sessionClient = getSessionClient();
+            sessionClient.clear();
+            mTvStatus.setText("clear data");
+            showSignedOutMode();
+
                         } else if (status == EMAIL_VERIFICATION_AUTHENTICATED
                                 || status == EMAIL_VERIFICATION_UNAUTHENTICATED) {
                             //Result is email verification. sign in again.
@@ -467,7 +467,6 @@ public class SampleActivity extends AppCompatActivity {
     private void showAuthenticatedMode() {
         mGetProfile.setVisibility(View.VISIBLE);
         mSignOut.setVisibility(View.VISIBLE);
-        mClearData.setVisibility(View.VISIBLE);
         mRefreshToken.setVisibility(View.VISIBLE);
         mRevokeContainer.setVisibility(View.VISIBLE);
         mSignInBrowser.setVisibility(View.GONE);
@@ -478,7 +477,6 @@ public class SampleActivity extends AppCompatActivity {
         mGetProfile.setVisibility(View.GONE);
         mSignOut.setVisibility(View.GONE);
         mRefreshToken.setVisibility(View.GONE);
-        mClearData.setVisibility(View.GONE);
         mRevokeContainer.setVisibility(View.GONE);
         mTvStatus.setText("");
     }
